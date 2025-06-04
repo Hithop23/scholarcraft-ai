@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -82,6 +83,7 @@ export default function HomePage() {
                 height={600}
                 className="w-full h-auto object-cover"
                 data-ai-hint="education technology"
+                priority
               />
             </Card>
           </div>
