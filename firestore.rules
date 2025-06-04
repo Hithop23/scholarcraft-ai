@@ -1,0 +1,84 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to get user role
+    function getUserRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+
+    // Users: Profile data, progress, roles, etc.
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || getUserRole(request.auth.uid) == 'admin');
+      allow create: if request.auth != null; // Typically for new user signup. Ensure uid matches request.auth.uid.
+      allow update: if request.auth != null && (request.auth.uid == userId || getUserRole(request.auth.uid) == 'admin');
+      // Deletion should be handled by a Cloud Function for data integrity.
+    }
+
+    // Materials: Uploaded content (PDF, audio, video, links)
+    match /materials/{materialId} {
+      allow read: if request.auth != null; // All authenticated users can read (could be refined with public/private flags)
+      allow create: if request.auth != null && request.resource.data.uploaderUid == request.auth.uid;
+      allow update, delete: if request.auth != null && (resource.data.uploaderUid == request.auth.uid || getUserRole(request.auth.uid) in ['teacher', 'admin']);
+    }
+
+    // Summaries: AI-generated summaries
+    match /summaries/{summaryId} {
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || getUserRole(request.auth.uid) == 'admin');
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && (resource.data.userId == request.auth.uid || getUserRole(request.auth.uid) == 'admin');
+    }
+
+    // Study Plans: Personalized calendars
+    match /study_plans/{planId} {
+      allow read, create, update, delete: if request.auth != null && 
+                                            ( (request.method != 'create' && resource.data.userId == request.auth.uid) || 
+                                              (request.method == 'create' && request.resource.data.userId == request.auth.uid) ||
+                                              getUserRole(request.auth.uid) == 'admin'
+                                            );
+    }
+
+    // Quizzes: AI-generated evaluations
+    match /quizzes/{quizId} {
+      // Assumes quizzes can be public or user-specific. This rule allows read for authenticated users.
+      allow read: if request.auth != null; 
+      // Quiz creation and management might be restricted to teachers/admins or through AI flows triggered by users.
+      allow create: if request.auth != null && (request.resource.data.creatorUid == request.auth.uid || getUserRole(request.auth.uid) in ['teacher', 'admin']);
+      allow update, delete: if request.auth != null && (resource.data.creatorUid == request.auth.uid || getUserRole(request.auth.uid) in ['teacher', 'admin']);
+    }
+    
+    // GeneratedQuizzes (if storing results of AI quiz generation for user)
+    match /generatedQuizzes/{gQuizId} {
+        allow read, create, update, delete: if request.auth != null && 
+                                            ( (request.method != 'create' && resource.data.userId == request.auth.uid) || 
+                                              (request.method == 'create' && request.resource.data.userId == request.auth.uid)
+                                            );
+    }
+
+    // Flashcards (if storing generated flashcards for user)
+    match /flashcardSets/{setId} {
+       allow read, create, update, delete: if request.auth != null && 
+                                            ( (request.method != 'create' && resource.data.userId == request.auth.uid) || 
+                                              (request.method == 'create' && request.resource.data.userId == request.auth.uid)
+                                            );
+    }
+
+
+    // Sessions: User's study session history
+    match /sessions/{sessionId} {
+      allow read, create, update, delete: if request.auth != null && 
+                                            ( (request.method != 'create' && resource.data.userId == request.auth.uid) || 
+                                              (request.method == 'create' && request.resource.data.userId == request.auth.uid) ||
+                                              getUserRole(request.auth.uid) == 'admin'
+                                            );
+    }
+
+    // Notifications: System messages and reminders
+    match /notifications/{notificationId} {
+      // Users can read and update (e.g., mark as read) their own notifications.
+      // Creation is typically handled by backend Cloud Functions.
+      allow read, update: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+  }
+}
