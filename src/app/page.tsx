@@ -106,8 +106,8 @@ export default function HomePage() {
                     {feature.icon}
                     <CardTitle className="mt-4 text-xl">{feature.title}</CardTitle>
                   </CardHeader>
-                  <CardContent className="text-center">
-                    <p className="text-muted-foreground">{feature.description}</p>
+                  <CardContent> {/* Removed text-center from here */}
+                    <p className="text-muted-foreground text-center md:text-left">{feature.description}</p> {/* Added text-center for small screens, md:text-left for medium and up */}
                   </CardContent>
                 </Card>
               ))}
